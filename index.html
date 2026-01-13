@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dictionary Web App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+  <style>
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+      font-family:'Poppins', sans-serif;
+    }
+
+    body{
+      min-height:100vh;
+      background:linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      perspective:1500px;
+      color:#fff;
+      overflow:hidden;
+    }
+
+    /* Floating glowing particles */
+    body::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:url("https://www.transparenttextures.com/patterns/stardust.png");
+      opacity:0.3;
+      animation:moveBg 20s linear infinite;
+    }
+
+    @keyframes moveBg{
+      from{background-position:0 0}
+      to{background-position:1000px 1000px}
+    }
+
+    .container{
+      width:400px;
+      padding:25px;
+      background:rgba(255,255,255,0.15);
+      backdrop-filter:blur(18px);
+      border-radius:25px;
+      box-shadow:0 30px 60px rgba(0,0,0,0.5);
+      transform-style:preserve-3d;
+      animation:float 5s ease-in-out infinite;
+      position:relative;
+      z-index:1;
+    }
+
+    @keyframes float{
+      0%{transform:rotateX(8deg) rotateY(-8deg) translateY(0)}
+      50%{transform:rotateX(-8deg) rotateY(8deg) translateY(-15px)}
+      100%{transform:rotateX(8deg) rotateY(-8deg) translateY(0)}
+    }
+
+    h1{
+      text-align:center;
+      margin-bottom:20px;
+      font-weight:600;
+      letter-spacing:1px;
+    }
+
+    .search-box{
+      display:flex;
+      gap:10px;
+      margin-bottom:20px;
+    }
+
+    .search-box input{
+      flex:1;
+      padding:12px 16px;
+      border:none;
+      border-radius:12px;
+      outline:none;
+      font-size:15px;
+    }
+
+    .search-box button{
+      padding:12px 20px;
+      border:none;
+      border-radius:12px;
+      background:linear-gradient(135deg,#ff9800,#ffc107);
+      color:#000;
+      font-weight:600;
+      cursor:pointer;
+      transition:0.3s;
+    }
+
+    .search-box button:hover{
+      transform:scale(1.05);
+    }
+
+    .result{
+      margin-top:10px;
+      animation:cardPop 0.7s ease;
+    }
+
+    @keyframes cardPop{
+      0%{opacity:0; transform:scale(0.9) rotateX(20deg)}
+      100%{opacity:1; transform:scale(1) rotateX(0)}
+    }
+
+    .word{
+      font-size:24px;
+      font-weight:600;
+      text-transform:capitalize;
+    }
+
+    .phonetic{
+      opacity:0.9;
+      margin:5px 0;
+    }
+
+    .part{
+      font-style:italic;
+      color:#ffd54f;
+    }
+
+    .meaning, .example, .hindi{
+      margin-top:10px;
+      line-height:1.5;
+      font-size:14px;
+    }
+
+    .hindi{
+      color:#c8e6ff;
+    }
+
+    .audio-btn{
+      margin-top:12px;
+      padding:9px 16px;
+      border:none;
+      border-radius:20px;
+      background:linear-gradient(135deg,#4caf50,#2e7d32);
+      color:#fff;
+      cursor:pointer;
+      display:none;
+    }
+
+    .error{
+      text-align:center;
+      color:#ff5252;
+      margin-top:15px;
+      font-weight:500;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Dictionary</h1>
+
+    <div class="search-box">
+      <input type="text" id="wordInput" placeholder="Enter a word..." />
+      <button onclick="searchWord()">Search</button>
+    </div>
+
+    <div id="output"></div>
+  </div>
+
+<script>
+  const input = document.getElementById('wordInput');
+  const output = document.getElementById('output');
+
+  input.addEventListener('keypress', function(e){
+    if(e.key === 'Enter'){
+      searchWord();
+    }
+  });
+
+  async function searchWord(){
+    const word = input.value.trim();
+
+    if(word === ''){
+      alert('Please enter a word');
+      return;
+    }
+
+    output.innerHTML = 'Searching...';
+
+    try{
+      const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+      if(!res.ok) throw new Error('Not Found');
+
+      const data = await res.json();
+      const entry = data[0];
+      const meaningData = entry.meanings[0];
+      const definitionData = meaningData.definitions[0];
+
+      const phonetic = entry.phonetic || 'Not available';
+      const partOfSpeech = meaningData.partOfSpeech;
+      const meaning = definitionData.definition;
+      const example = definitionData.example || 'Example not available';
+
+      /* Hindi translation using MyMemory API */
+      let hindiMeaning = 'Hindi meaning not available';
+      try{
+        const hiRes = await fetch(`https://api.mymemory.translated.net/get?q=${meaning}&langpair=en|hi`);
+        const hiData = await hiRes.json();
+        hindiMeaning = hiData.responseData.translatedText;
+      }catch{}
+
+      let audio = '';
+      if(entry.phonetics){
+        const audioObj = entry.phonetics.find(p => p.audio);
+        if(audioObj) audio = audioObj.audio;
+      }
+
+      output.innerHTML = `
+        <div class="result">
+          <div class="word">${entry.word}</div>
+          <div class="phonetic">/${phonetic}/</div>
+          <div class="part">(${partOfSpeech})</div>
+          <div class="meaning"><b>Meaning (English):</b> ${meaning}</div>
+          <div class="hindi"><b>Meaning (Hindi):</b> ${hindiMeaning}</div>
+          <div class="example"><b>Example:</b> ${example}</div>
+          <button class="audio-btn" id="audioBtn">🔊 Play Pronunciation</button>
+        </div>
+      `;
+
+      if(audio){
+        const audioBtn = document.getElementById('audioBtn');
+        const sound = new Audio(audio);
+        audioBtn.style.display = 'inline-block';
+        audioBtn.onclick = () => sound.play();
+      }
+
+    }catch(error){
+      output.innerHTML = '<div class="error">Word not found. Please try another word.</div>';
+    }
+  }
+</script>
+
+</body>
+</html>
